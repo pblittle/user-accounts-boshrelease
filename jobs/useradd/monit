@@ -1,0 +1,4 @@
+check file useradd
+  with path /var/vcap/sys/run/useradd/useradd.lock
+  start program "/var/vcap/jobs/useradd/bin/useradd_ctl start"
+  group vcap

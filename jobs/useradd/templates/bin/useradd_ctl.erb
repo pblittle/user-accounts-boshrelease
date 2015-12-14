@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+
+# Fail fast, including pipelines
+#
+set -eo pipefail
+
+set -x
+
+# Release job run and log directories
+#
+readonly RUN_DIR=/var/vcap/sys/run/useradd
+readonly LOG_DIR=/var/vcap/sys/log/useradd
+
+# Prepare the release environment
+#
+prepare_env() {
+    mkdir -p $RUN_DIR $LOG_DIR
+    chown -R vcap:vcap $RUN_DIR $LOG_DIR
+}
+
+# Prepare the release logs
+#
+prepare_logs() {
+    exec 1>> $LOG_DIR/useradd.out.log
+    exec 2>> $LOG_DIR/useradd.err.log
+}
+
+# Import public SSH key into the authorized_keys file
+#
+import_ssh_key() {
+
+    if [[ ! -d /home/nessus/.ssh ]]; then
+        mkdir -p /home/nessus/.ssh
+        chmod 700 /home/nessus/.ssh
+    fi
+
+    if [[ ! -e /home/nessus/.ssh/authorized_keys ]]; then
+        touch /home/nessus/.ssh/authorized_keys
+        chmod 600 /home/nessus/.ssh/authorized_keys
+    fi
+
+    chown -R nessus:nessus /home/nessus/.ssh
+
+    echo 'from="172.32.0.0/22,10.0.1.15",no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDrtcQjz4xEXJPMhlHMrM4K/3btzkLjob6jGRaodUhPOHWuH1GVDodC1bTVLvFe+0XxmglXXVUqlr8L/LyN+ccUUohI7k5bjM7DbuiIwUwXj6o7+uVYakPT2tv8nb51XUHKOSpgvz1IjVvt+5xLecS13SeXASOTkxfrZqn6WIDNh2kcnYAKQtRzCLYS3TnxSRSvki7vb7FxN6Jo+q7tA3h7Zq7llvF1WZe8QViGCw/oW9QDjDDei6daDGP0ZIS9KcExPml1tjCWNHZ7chSvgxQAgywlhlSDPszZ0A0p5BNYBWmXCuDFsBSve4Xgxfsl59UM3BCvgG87kYwVxWBYzY266mAZ+b9wtgi2h2ynEAX+Gf5LKcYCs1bIly5+LrH2CGfupBbB3M2xuwDaIiUzF28wE0bju+f13XlMJyNOXvwLR3pEAiZP0LFl2nGGNi7oMDhoE4jxQtGfOsRbh45/KHYaJic5oweIw9l7rth2mxEHLGAbzvhLfkzokjIdChmJLbpOugPz5BjTxO/pIsprj0oJIItKvDHTZVd/g6gY+/t26sNi+0jLA1C1PuithqwUxPyEzQDKRh7e+zMfyA4Yjpo8Ym5ir1yYdh9OVjqlIrtNQIcSePZJqa35tdE7cRgZDJPF8I2Ga/dfxqCujPptScCYjSs/niLcb9osm2EKSoFHhw== for nessus security scans' > /home/nessus/.ssh/authorized_keys
+}
+
+add_user_to_sudoers() {
+    echo "nessus ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/nessus
+
+    chmod 0440 /etc/sudoers.d/nessus
+}
+
+# Add the individual user account
+#
+user_add() {
+    local USERADD_ARGS=$1
+
+    echo $USERADD_ARGS
+
+    /usr/sbin/useradd $USERADD_ARGS
+
+    import_ssh_key
+
+    add_user_to_sudoers
+}
+
+# Iterate through and add array of user accounts
+#
+add_users() {
+    <% p('properties.user-accounts.users', []).each do |user|
+      useradd_args = ""
+      useradd_args += " --comment '#{user['comment']}'" if user['comment']
+      useradd_args += " --create-home" if user['create_home']
+      useradd_args += " --user-group" if user['user_group']
+      useradd_args += " --password '#{user['password']}'" if user['password']
+      useradd_args += " --system" if user['system']
+      useradd_args += " --non-unique" if user['non_unique']
+      useradd_args += " #{user['username']}" if user['username']
+    %>
+
+    echo "<%= useradd_args %>"
+
+    <% end %>
+
+    user_add '--user-group --shell /bin/false --create-home nessus'
+}
+
+# Add or delete the given user accounts
+#
+case $1 in
+    start)
+        prepare_env
+        prepare_logs
+
+        add_users
+
+        touch $RUN_DIR/useradd.lock
+        ;;
+    *)
+        echo "Usage: $0 {start}"
+        exit 1
+        ;;
+esac

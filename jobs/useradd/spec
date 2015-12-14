@@ -1,0 +1,35 @@
+---
+name: useradd
+
+templates:
+  bin/useradd_ctl.erb: bin/useradd_ctl
+
+packages: []
+
+properties:
+  useradd.users:
+    description: "List of users to be added"
+    example:
+      - username: # The name of the user.
+
+        comment: # Any text string.
+
+        password: # The encrypted password, as returned by crypt.
+
+        system: # Create a system account.
+
+        create_home: # Create the user's home directory if it does not exist.
+
+        non_unique: # Allow the creation of a user account with a duplicate UID.
+
+        user_group: # Create a group with the same name as the user, and add the user to this group.
+
+        ssh_keys: # An array of ssh key string values.
+
+        uid: # The numerical value of the user's ID.
+
+        gid: # The group name or number of the user's initial login group.
+
+        home: # The user's login directory.
+
+        shell: # The name of the user's login shell.
