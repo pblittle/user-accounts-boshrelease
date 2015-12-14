@@ -1,5 +1,3 @@
-https://coreos.com/os/docs/latest/cloud-config.html
-
 # User Accounts BOSH Release
 
 This is a [BOSH](https://bosh.io) release for managing user accounts and SSH keys.
